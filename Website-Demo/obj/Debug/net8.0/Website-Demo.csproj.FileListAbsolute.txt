@@ -32,3 +32,4 @@
 /Users/sathishsuresh/Downloads/Website-Demo/obj/Debug/net8.0/Website-Demo.pdb
 /Users/sathishsuresh/Downloads/Website-Demo/obj/Debug/net8.0/Website-Demo.genruntimeconfig.cache
 /Users/sathishsuresh/Downloads/Website-Demo/obj/Debug/net8.0/ref/Website-Demo.dll
+/Users/sathishsuresh/Downloads/Website-Demo/obj/Debug/net8.0/Website-Demo.sourcelink.json
