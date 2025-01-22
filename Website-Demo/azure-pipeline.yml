@@ -1,0 +1,221 @@
+trigger:
+  - master  # Trigger on changes to the main branch
+
+pool:
+  name: agent  # Ensure you are using a valid agent
+
+stages:
+  - stage: Build
+    displayName: Development
+    jobs:
+      - job: Build
+        displayName: Development
+        steps:
+          # Set up the .NET SDK for building and publishing
+          - task: UseDotNet@2
+            inputs:
+              packageType: 'sdk'
+              version: '5.x'  # Or whatever version you are using
+
+          # Restore dependencies
+          - task: DotNetCoreCLI@2
+            inputs:
+              command: 'restore'
+              projects: '**/*.csproj'
+
+          # Build the application
+          - task: DotNetCoreCLI@2
+            inputs:
+              command: 'build'
+              projects: '**/*.csproj'
+              arguments: '--configuration Release'
+
+          # Publish the application
+          - task: DotNetCoreCLI@2
+            inputs:
+              command: 'publish'
+              projects: '**/*.csproj'
+              arguments: '--configuration Release --output $(Build.ArtifactStagingDirectory)/publish'
+
+          # Publish the artifact (the published app) for deployment
+          - task: PublishBuildArtifacts@1
+            inputs:
+              PathtoPublish: '$(Build.ArtifactStagingDirectory)/publish'
+              ArtifactName: 'webAppDrop'
+
+  - stage: DevRelease
+    displayName: 'ReadyForDevRelease'
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - job: waitForValidation
+        displayName: Waiting for approval to promote QA Release
+        pool: server
+        timeoutInMinutes: 4320  # job times out in 3 days
+        steps:
+          - task: ManualValidation@0
+            timeoutInMinutes: 1400  # task times out in 1 day
+            inputs:
+              notifyUsers: |
+                sathishksuresh@gmail.com
+              instructions: 'Waiting for approval to promote QA Release'
+              onTimeout: 'resume'
+
+  - stage: DeployDev
+    displayName: Deploy dev to IIS 
+    dependsOn: DevRelease
+    condition: succeeded()
+    jobs:
+      - deployment: DevDeployment
+        displayName: 'Deploy to Dev'
+        environment: 'Dev'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                # Download the artifact (published app)
+                - task: DownloadBuildArtifacts@0
+                  inputs:
+                    buildType: 'current'
+                    downloadType: 'single'
+                    artifactName: 'webAppDrop'
+                    downloadPath: '$(Pipeline.Workspace)/webAppDrop'
+
+                # Deploy to IIS dev folder
+                - powershell: |
+                    $SourcePath = "$(Pipeline.Workspace)\webAppDrop"
+                    $DestPath = "C:\inetpub\wwwroot\dev"
+
+                    Write-Host "Source Path: $SourcePath"
+                    Write-Host "Destination Path: $DestPath"
+
+                    if (-Not (Test-Path $DestPath)) {
+                        New-Item -ItemType Directory -Force -Path $DestPath
+                    }
+
+                    if (Test-Path $SourcePath) {
+                        Copy-Item -Path "$SourcePath\*" -Destination $DestPath -Recurse -Force
+                        Write-Host "App deployed successfully to dev."
+                    } else {
+                        Write-Host "ERROR: Source path does not exist."
+                        exit 1
+                    }
+                  displayName: Deploy App to IIS (Dev)
+
+                # Restart IIS to apply changes
+                - powershell: |
+                    Write-Host "Restarting IIS..."
+                    iisreset
+                  displayName: Restart IIS (Dev)
+
+  - stage: QARelease
+    displayName: 'ReadyForQARelease'
+    dependsOn: DeployDev
+    condition: succeeded()
+    jobs:
+      - job: waitForValidation
+        displayName: Waiting for approval to promote QA Release
+        pool: server
+        timeoutInMinutes: 4320  # job times out in 3 days
+        steps:
+          - task: ManualValidation@0
+            timeoutInMinutes: 1400  # task times out in 1 day
+            inputs:
+              notifyUsers: |
+                sathishksuresh@gmail.com
+              instructions: 'Waiting for approval to promote QA Release'
+              onTimeout: 'resume'
+
+  - stage: DeployQA
+    displayName: Deploy QA to IIS 
+    dependsOn: QARelease
+    condition: succeeded()
+    jobs:
+      - deployment: QADeployment
+        displayName: 'Deploy to QA'
+        environment: 'QA'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                # Download the artifact (published app)
+                - task: DownloadBuildArtifacts@0
+                  inputs:
+                    buildType: 'current'
+                    downloadType: 'single'
+                    artifactName: 'webAppDrop'
+                    downloadPath: '$(Pipeline.Workspace)/webAppDrop'
+
+                # Deploy to IIS qa folder
+                - powershell: |
+                    $SourcePath = "$(Pipeline.Workspace)\webAppDrop"
+                    $DestPath = "C:\inetpub\wwwroot\qa"
+
+                    Write-Host "Source Path: $SourcePath"
+                    Write-Host "Destination Path: $DestPath"
+
+                    if (-Not (Test-Path $DestPath)) {
+                        New-Item -ItemType Directory -Force -Path $DestPath
+                    }
+
+                    if (Test-Path $SourcePath) {
+                        Copy-Item -Path "$SourcePath\*" -Destination $DestPath -Recurse -Force
+                        Write-Host "App deployed successfully to QA."
+                    } else {
+                        Write-Host "ERROR: Source path does not exist."
+                        exit 1
+                    }
+                  displayName: Deploy App to IIS (QA)
+
+                # Restart IIS to apply changes
+                - powershell: |
+                    Write-Host "Restarting IIS..."
+                    iisreset
+                  displayName: Restart IIS (QA)
+
+  - stage: DeployProduction
+    displayName: Deploy Prod to IIS 
+    dependsOn: ProductionRelease
+    condition: succeeded()
+    jobs:
+      - deployment: ProductionDeployment
+        displayName: 'Deploy to Prod'
+        environment: 'Production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                # Download the artifact (published app)
+                - task: DownloadBuildArtifacts@0
+                  inputs:
+                    buildType: 'current'
+                    downloadType: 'single'
+                    artifactName: 'webAppDrop'
+                    downloadPath: '$(Pipeline.Workspace)/webAppDrop'
+
+                # Deploy to IIS production folder
+                - powershell: |
+                    $SourcePath = "$(Pipeline.Workspace)\webAppDrop"
+                    $DestPath = "C:\inetpub\wwwroot\production"
+
+                    Write-Host "Source Path: $SourcePath"
+                    Write-Host "Destination Path: $DestPath"
+
+                    if (-Not (Test-Path $DestPath)) {
+                        New-Item -ItemType Directory -Force -Path $DestPath
+                    }
+
+                    if (Test-Path $SourcePath) {
+                        Copy-Item -Path "$SourcePath\*" -Destination $DestPath -Recurse -Force
+                        Write-Host "App deployed successfully to production."
+                    } else {
+                        Write-Host "ERROR: Source path does not exist."
+                        exit 1
+                    }
+                  displayName: Deploy App to IIS (Production)
+
+                # Restart IIS to apply changes
+                - powershell: |
+                    Write-Host "Restarting IIS..."
+                    iisreset
+                  displayName: Restart IIS (Production)
