@@ -1,0 +1,401 @@
+# trigger:
+#   - Release* 
+
+# pool:
+#   name: agent
+
+# stages:
+#   - stage: Build
+#     displayName: Build
+#     jobs:
+#       - job: Build
+#         displayName: Build the Project
+#         steps:
+          
+#           - task: UseDotNet@2
+#             inputs:
+#               packageType: 'sdk'
+#               version: '6.x' 
+#               installationPath: $(Agent.ToolsDirectory)/dotnet
+
+          
+#           - script: |
+#               dotnet restore $(Build.SourcesDirectory)/Website-Demo/Website-Demo.csproj
+#               dotnet publish $(Build.SourcesDirectory)/Website-Demo/Website-Demo.csproj -c Release -o $(Build.ArtifactStagingDirectory)\publish
+#             displayName: 'Restore and Build the Project'
+
+          
+#           - task: PublishBuildArtifacts@1
+#             inputs:
+#               PathtoPublish: '$(Build.ArtifactStagingDirectory)\publish'
+#               ArtifactName: 'webAppDrop'
+
+#   - stage: DeployDev
+#     displayName: Deploy to Dev
+#     dependsOn: Build
+#     variables:
+#       - group: DevGroup 
+#     jobs:
+#       - deployment: DevDeployment
+#         displayName: 'Deploy to Dev'
+#         environment: 'Dev'
+#         strategy:
+#           runOnce:
+#             deploy:
+#               steps:
+                
+#                 - task: DownloadBuildArtifacts@0
+#                   inputs:
+#                     buildType: 'current'
+#                     downloadType: 'single'
+#                     artifactName: 'webAppDrop'
+#                     downloadPath: '$(Pipeline.Workspace)\webAppDrop'
+
+#                 - powershell: |
+#                     Write-Host "Stoping IIS..."
+#                     iisreset /stop
+#                   displayName: stop IIS (Dev)
+#                 - powershell: |
+#                     $appSettingsPath = "$(Pipeline.Workspace)\webAppDrop\appsettings.json"
+#                     $json = Get-Content -Path $appSettingsPath -Raw | ConvertFrom-Json
+#                     $json.FeatureManagement.FeatureA = "$(FeatureA)"
+#                     $json.FeatureManagement.FeatureB = "$(FeatureB)"
+#                     $json | ConvertTo-Json -Depth 10 | Out-File -FilePath $appSettingsPath -Encoding UTF8
+#                   displayName: Update appsettings.json for Dev
+
+                
+#                 - powershell: |
+#                     $SourcePath = "$(Pipeline.Workspace)\webAppDrop"
+#                     $DestPath = "C:\inetpub\wwwroot\dev"
+
+#                     Write-Host "Source Path: $SourcePath"
+#                     Write-Host "Destination Path: $DestPath"
+
+#                     if (-Not (Test-Path $DestPath)) {
+#                       New-Item -ItemType Directory -Force -Path $DestPath
+#                     }
+
+#                     if (Test-Path $SourcePath) {
+#                       Copy-Item -Path "$SourcePath\*" -Destination $DestPath -Recurse -Force
+#                       Write-Host "Web app deployed successfully to dev."
+#                     } else {
+#                       Write-Host "ERROR: Source path does not exist."
+#                       exit 1
+#                     }
+#                   displayName: Deploy Web App to IIS (Dev)
+
+                
+#                 - powershell: |
+#                     Write-Host "starting IIS..."
+#                     iisreset /start
+#                   displayName: start IIS (Dev)
+
+#   - stage: DeployQA
+#     displayName: Deploy to QA
+#     dependsOn: DeployDev
+#     variables:
+#       - group: QAGroup 
+#     jobs:
+#       - deployment: QADeployment
+#         displayName: 'Deploy to QA'
+#         environment: 'QA'
+#         strategy:
+#           runOnce:
+#             deploy:
+#               steps:
+                
+#                 - task: DownloadBuildArtifacts@0
+#                   inputs:
+#                     buildType: 'current'
+#                     downloadType: 'single'
+#                     artifactName: 'webAppDrop'
+#                     downloadPath: '$(Pipeline.Workspace)\webAppDrop'
+                
+                
+#                 - powershell: |
+#                     $appSettingsPath = "$(Pipeline.Workspace)\webAppDrop\appsettings.json"
+#                     $json = Get-Content -Path $appSettingsPath -Raw | ConvertFrom-Json
+#                     $json.FeatureManagement.FeatureA = "$(FeatureA)"
+#                     $json.FeatureManagement.FeatureB = "$(FeatureB)"
+#                     $json | ConvertTo-Json -Depth 10 | Out-File -FilePath $appSettingsPath -Encoding UTF8
+#                   displayName: Update appsettings.json for QA
+#                 - powershell: |
+#                     Write-Host "Stopping IIS..."
+#                     iisreset /stop
+#                   displayName: stop IIS (QA)
+                
+#                 - powershell: |
+#                     $SourcePath = "$(Pipeline.Workspace)\webAppDrop"
+#                     $DestPath = "C:\inetpub\wwwroot\qa"
+
+#                     Write-Host "Source Path: $SourcePath"
+#                     Write-Host "Destination Path: $DestPath"
+
+#                     if (-Not (Test-Path $DestPath)) {
+#                       New-Item -ItemType Directory -Force -Path $DestPath
+#                     }
+
+#                     if (Test-Path $SourcePath) {
+#                       Copy-Item -Path "$SourcePath\*" -Destination $DestPath -Recurse -Force
+#                       Write-Host "Web app deployed successfully to QA."
+#                     } else {
+#                       Write-Host "ERROR: Source path does not exist."
+#                       exit 1
+#                     }
+#                   displayName: Deploy Web App to IIS (QA)
+
+                
+#                 - powershell: |
+#                     Write-Host "starting IIS..."
+#                     iisreset /start
+#                   displayName: start IIS (QA)
+
+#   - stage: DeployProduction
+#     displayName: Deploy to Production
+#     dependsOn: DeployQA
+#     variables:
+#       - group: ProdGroup 
+#     jobs:
+#       - deployment: ProductionDeployment
+#         displayName: 'Deploy to Production'
+#         environment: 'Production'
+#         strategy:
+#           runOnce:
+#             deploy:
+#               steps:
+                
+#                 - task: DownloadBuildArtifacts@0
+#                   inputs:
+#                     buildType: 'current'
+#                     downloadType: 'single'
+#                     artifactName: 'webAppDrop'
+#                     downloadPath: '$(Pipeline.Workspace)\webAppDrop'
+
+                
+#                 - powershell: |
+#                     $appSettingsPath = "$(Pipeline.Workspace)\webAppDrop\appsettings.json"
+#                     $json = Get-Content -Path $appSettingsPath -Raw | ConvertFrom-Json
+#                     $json.FeatureManagement.FeatureA = "$(FeatureA)"
+#                     $json.FeatureManagement.FeatureB = "$(FeatureB)"
+#                     $json | ConvertTo-Json -Depth 10 | Out-File -FilePath $appSettingsPath -Encoding UTF8
+#                   displayName: Update appsettings.json for Production
+
+#                 - powershell: |
+#                     Write-Host "Stopping IIS..."
+#                     iisreset /stop
+#                   displayName: stop IIS (Prod)
+#                 - powershell: |
+#                     $SourcePath = "$(Pipeline.Workspace)\webAppDrop"
+#                     $DestPath = "C:\inetpub\wwwroot\production"
+
+#                     Write-Host "Source Path: $SourcePath"
+#                     Write-Host "Destination Path: $DestPath"
+
+#                     if (-Not (Test-Path $DestPath)) {
+#                       New-Item -ItemType Directory -Force -Path $DestPath
+#                     }
+
+#                     if (Test-Path $SourcePath) {
+#                       Copy-Item -Path "$SourcePath\*" -Destination $DestPath -Recurse -Force
+#                       Write-Host "Web app deployed successfully to production."
+#                     } else {
+#                       Write-Host "ERROR: Source path does not exist."
+#                       exit 1
+#                     }
+#                   displayName: Deploy Web App to IIS (Production)
+
+                
+#                 - powershell: |
+#                     Write-Host "starting IIS..."
+#                     iisreset /start
+#                   displayName: start IIS (Production)
+
+trigger:
+  - Release*
+
+pool:
+  name: agent
+
+stages:
+  - stage: Build
+    displayName: Development
+    jobs:
+      - job: Build
+        displayName: Development
+        steps:
+          - task: UseDotNet@2
+            inputs:
+              packageType: 'sdk'
+              version: '6.x'
+              installationPath: $(Agent.ToolsDirectory)/dotnet
+
+          - script: |
+              dotnet restore $(Build.SourcesDirectory)/Website-Demo/Website-Demo.csproj
+              dotnet publish $(Build.SourcesDirectory)/Website-Demo/Website-Demo.csproj -c Release -o $(Build.ArtifactStagingDirectory)\publish
+            displayName: 'Restore and Build the Project'
+
+          - task: PublishBuildArtifacts@1
+            inputs:
+              PathtoPublish: '$(Build.ArtifactStagingDirectory)\publish'
+              ArtifactName: 'webAppDrop'
+
+  - stage: DevRelease
+    displayName: 'ReadyForDevRelease'
+    dependsOn: Build
+    condition: succeeded()
+    jobs:
+      - job: waitForValidation
+        displayName: Waiting for approval to promote QA Release
+        pool: server
+        timeoutInMinutes: 4320
+        steps:
+          - task: ManualValidation@0
+            timeoutInMinutes: 1400
+            inputs:
+              notifyUsers: |
+                sathishksuresh@gmail.com
+              instructions: 'Waiting for approval to promote QA Release'
+              onTimeout: 'resume'
+
+  - stage: DeployDev
+    displayName: Deploy dev to IIS
+    dependsOn: DevRelease
+    condition: succeeded()
+    jobs:
+      - deployment: DevDeployment
+        displayName: 'Deploy to Dev'
+        environment: 'Dev'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: DownloadBuildArtifacts@0
+                  inputs:
+                    buildType: 'current'
+                    downloadType: 'single'
+                    artifactName: 'webAppDrop'
+                    downloadPath: '$(Pipeline.Workspace)\webAppDrop'
+                - powershell: |
+                    iisreset /stop
+                  displayName: Stop IIS (Dev)
+                - powershell: |
+                    $SourcePath = "$(Pipeline.Workspace)\webAppDrop"
+                    $DestPath = "C:\inetpub\wwwroot\dev"
+
+                    if (-Not (Test-Path $DestPath)) {
+                      New-Item -ItemType Directory -Force -Path $DestPath
+                    }
+
+                    if (Test-Path $SourcePath) {
+                      Copy-Item -Path "$SourcePath\*" -Destination $DestPath -Recurse -Force
+                    } else {
+                      exit 1
+                    }
+                  displayName: Deploy Web App to IIS (Dev)
+
+                - powershell: |
+                    iisreset /start
+                  displayName: Start IIS (Dev)
+
+  - stage: QARelease
+    displayName: 'ReadyForQARelease'
+    dependsOn: DeployDev
+    condition: succeeded()
+    jobs:
+      - job: waitForValidation
+        displayName: Waiting for approval to promote QA Release
+        pool: server
+        timeoutInMinutes: 4320
+        steps:
+          - task: ManualValidation@0
+            timeoutInMinutes: 1400
+            inputs:
+              notifyUsers: |
+                sathishksuresh@gmail.com
+              instructions: 'Waiting for approval to promote QA Release'
+              onTimeout: 'resume'
+
+  - stage: DeployQA
+    displayName: Deploy QA to IIS
+    dependsOn: QARelease
+    condition: succeeded()
+    jobs:
+      - deployment: QADeployment
+        displayName: 'Deploy to QA'
+        environment: 'QA'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: DownloadBuildArtifacts@0
+                  inputs:
+                    buildType: 'current'
+                    downloadType: 'single'
+                    artifactName: 'webAppDrop'
+                    downloadPath: '$(Pipeline.Workspace)\webAppDrop'
+
+                - powershell: |
+                    iisreset /stop
+                  displayName: Stop IIS (QA)    
+
+                - powershell: |
+                    $SourcePath = "$(Pipeline.Workspace)\webAppDrop"
+                    $DestPath = "C:\inetpub\wwwroot\qa"
+
+                    if (-Not (Test-Path $DestPath)) {
+                      New-Item -ItemType Directory -Force -Path $DestPath
+                    }
+
+                    if (Test-Path $SourcePath) {
+                      Copy-Item -Path "$SourcePath\*" -Destination $DestPath -Recurse -Force
+                    } else {
+                      exit 1
+                    }
+                  displayName: Deploy Web App to IIS (QA)
+
+                - powershell: |
+                    iisreset /start
+                  displayName: Start IIS (QA)
+
+  - stage: DeployProduction
+    displayName: Deploy Prod to IIS
+    dependsOn: QARelease
+    condition: succeeded()
+    jobs:
+      - deployment: ProductionDeployment
+        displayName: 'Deploy to Prod'
+        environment: 'Production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: DownloadBuildArtifacts@0
+                  inputs:
+                    buildType: 'current'
+                    downloadType: 'single'
+                    artifactName: 'webAppDrop'
+                    downloadPath: '$(Pipeline.Workspace)\webAppDrop'
+                - powershell: |
+                    iisreset /stop
+                  displayName: Stop IIS (Prod)
+
+                - powershell: |
+                    $SourcePath = "$(Pipeline.Workspace)\webAppDrop"
+                    $DestPath = "C:\inetpub\wwwroot\production"
+
+                    if (-Not (Test-Path $DestPath)) {
+                      New-Item -ItemType Directory -Force -Path $DestPath
+                    }
+
+                    if (Test-Path $SourcePath) {
+                      Copy-Item -Path "$SourcePath\*" -Destination $DestPath -Recurse -Force
+                    } else {
+                      exit 1
+                    }
+                  displayName: Deploy Web App to IIS (Production)
+
+                - powershell: |
+                    iisreset /start
+                  displayName: Start IIS (Production)
+
+

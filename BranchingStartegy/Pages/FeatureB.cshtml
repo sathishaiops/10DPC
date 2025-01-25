@@ -1,0 +1,25 @@
+@page
+@model Website_Demo.Pages.FeatureB
+@using Microsoft.FeatureManagement
+@inject IFeatureManager FeatureManager
+
+@{
+    ViewData["Title"] = "FeatureB";
+}
+
+<h1>@ViewData["Title"]</h1>
+
+@if (await FeatureManager.IsEnabledAsync("FeatureB"))
+{
+    <!-- FeatureB is enabled message -->
+    <div class="alert alert-success">
+        <strong>FeatureB is enabled!</strong> You can access this feature.
+    </div>
+}
+else
+{
+    <!-- FeatureB is disabled message -->
+    <div class="alert alert-warning">
+        <strong>FeatureB is not enabled at the moment.</strong> Please check back later.
+    </div>
+}
