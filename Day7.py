@@ -30,3 +30,4 @@ skill.add("SQL")
 print("\nOriginal set after adding 'SQL':", skill)
 print("Frozenset remains unchanged:", frozenset_skills)
 
+
