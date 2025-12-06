@@ -1,6 +1,6 @@
 # Examples of Set and frozenset iteration
 
-skill = {"Python", "Java", "C++", "Python", "JavaScript"}
+skill = { "Java", "C++", "Python", "JavaScript"}
 print("Initial set:", skill)
 
 required_skills = {"Machine Learning", "Data Analysis"}
