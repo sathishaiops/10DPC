@@ -1,9 +1,9 @@
-# for i in range(1, 6):
-#     print("Day", i)
+for i in range(1, 6):
+    print("Day", i)
 
-# list_of_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
-# for day in list_of_days:
-#     print("Day of the week:", day)    
+list_of_days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+for day in list_of_days:
+    print("Day of the week:", day)    
 
 
 #Build a dictionary by adding key–value pairs in a loop
